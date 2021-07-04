@@ -4,49 +4,56 @@ require 'httparty'
 require 'csv'
 
 class Trader
-  PERCENT_STEP = 0.02
+  PERCENT_STEP = 0.005
 
   def self.run
     client = Client::Private.new
+    current_threshold = Redis.current.get("current_threshold")
+    current_threshold = Float(current_threshold) if current_threshold.present?
+
     if client.holding?(symbol: "eth")
-      puts "Holding!"
-    else
-      puts "Not holding!"
+      current_bid = client.get_current_bid(symbol: "eth")
+      updated_threshold = (current_bid * (1 - PERCENT_STEP)).round(2)
+      Rails.logger.info "Price: $#{current_bid}. Threshold: #{current_threshold}. Holding..."
+
+      if !current_threshold
+        Rails.logger.info "Setting current threshold to $#{updated_threshold}..."
+        Redis.current.set("current_threshold", updated_threshold)
+      elsif current_bid <= current_threshold
+        Rails.logger.info "Current bid of $#{current_bid} is less than current threshold of $#{current_threshold}..."
+        Rails.logger.info "Selling it all!!!"
+        client.sell_all(symbol: "eth")
+        Redis.current.del("current_threshold")
+      else # current_bid > current_threshold
+        if updated_threshold > current_threshold
+          Rails.logger.info "Updated threshold is more than current threshold."
+          Rails.logger.info "Resetting threshold to $#{updated_threshold}..."
+          Redis.current.set("current_threshold", updated_threshold)
+        end
+      end
+    else # Not Holding
+      current_ask = client.get_current_ask(symbol: "eth")
+      updated_threshold = (current_ask * (1 + PERCENT_STEP)).round(2)
+      Rails.logger.info "Price: $#{current_ask}. Threshold: #{current_threshold}. Not holding..."
+
+      if !current_threshold
+        Rails.logger.info "Setting current threshold to $#{updated_threshold}..."
+        Redis.current.set("current_threshold", updated_threshold)
+      elsif current_ask <= current_threshold
+        Rails.logger.info "Current ask of $#{current_ask} is less than current threshold of $#{current_threshold}..."
+        Rails.logger.info "Buying it all!!!"
+        client.buy_all(symbol: "eth")
+        Redis.current.del("current_threshold")
+      elsif current_ask > current_threshold
+        if updated_threshold < current_threshold
+          Rails.logger.info "Updated threshold is less than current threshold."
+          Rails.logger.info "Resetting threshold to $#{updated_threshold}..."
+          Redis.current.set("current_threshold", updated_threshold)
+        end
+      end
     end
-    #   current_bid := get current bid
-    #   updated_threshold := current bid * (1 - PERCENT_STEP)
-    #   if no current_threshold
-    #     current_threshold := updated_threshold
-    #   else if current_bid > previous_bid
-    #     current_threshold := updated_threshold
-    #   else if current_bid <= current_threshold
-    #     place sell order at current_threshold * 1.01
-    #     current_threshold := null
-    # else (not holding)
-    #   current_ask := get current ask
-    #   updated_threshold = current ask * (1 + PERCENT_STEP)
-    #   if no current_threshold
-    #     current_threshold := updated_threshold
-    #   else if current_price < previous_price
-    #     current_threshold := updated_threshold
-    #   else if current_bid >= current_threshold
-    #     place buy order at current_threshold * 0.99
-    #     current_threshold := null
   end
 end
-
-# Make a trade √
-# Sell all √
-# Buy all √
-# Make a order for buy all
-# Make a order for sell all
-# Get redis working locally
-# Get redis working remotely
-# Get worker working locally
-# Get worker working locally
-# Make a order based on price direction and holdings
-#
-
 module Client
   class Private
     APPROXIMATE_ALL = 0.95
@@ -76,8 +83,8 @@ module Client
       current_bid = get_current_bid(symbol: symbol).round(2)
       sell(
         symbol: "#{symbol}USD",
-        amount: token_balance * APPROXIMATE_ALL,
-        price: 0.01,
+        amount: (token_balance * APPROXIMATE_ALL).round(4),
+        price: current_bid,
         type: "exchange limit",
       )
     end
@@ -85,11 +92,11 @@ module Client
     def buy_all(symbol:)
       usd_balance = Float(balances.find { |e| e["currency"].downcase == "usd" }["available"])
       current_ask = get_current_ask(symbol: symbol).round(2)
-      amount = ((usd_balance * APPROXIMATE_ALL) / current_ask).round(4)
+      amount = ((usd_balance * APPROXIMATE_ALL) / current_ask)
       buy(
         symbol: "#{symbol}USD",
-        amount: amount,
-        price: 2**16,
+        amount: amount.round(4),
+        price: current_ask,
         type: "exchange limit",
       )
     end
@@ -99,17 +106,17 @@ module Client
     end
 
     def buy(symbol:, amount:, price:, type:)
-      place_order(
+      p place_order(
         symbol: symbol,
         amount: amount,
         price: (price * 1.01).round(2),
-        side: "sell",
+        side: "buy",
         type: type,
       )
     end
 
     def sell(symbol:, amount:, price:, type:)
-      place_order(
+      p place_order(
         symbol: symbol,
         amount: amount,
         price: (price * 0.99).round(2),
