@@ -7,8 +7,12 @@ class Trader
   PERCENT_STEP = 0.02
 
   def self.run
-    puts "Hello world!"
-    # if holding
+    client = Client::Private.new
+    if client.holding?(symbol: "eth")
+      puts "Holding!"
+    else
+      puts "Not holding!"
+    end
     #   current_bid := get current bid
     #   updated_threshold := current bid * (1 - PERCENT_STEP)
     #   if no current_threshold
@@ -46,6 +50,12 @@ end
 module Client
   class Private
     APPROXIMATE_ALL = 0.95
+    MINIMUM_TOKEN_AMOUNT = 0.001
+
+    def holding?(symbol:)
+      token_balance = Float(balances.find { |e| e["currency"].downcase == symbol.downcase }["available"])
+      token_balance > MINIMUM_TOKEN_AMOUNT
+    end
 
     def get_current_ask(symbol:)
       get_prices(symbol: symbol)[0]
