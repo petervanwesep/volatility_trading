@@ -10,9 +10,12 @@ class Trader
     client = Client::Private.new
     current_threshold = Redis.current.get("current_threshold")
     current_threshold = Float(current_threshold) if current_threshold.present?
+    current_bid = client.get_current_bid(symbol: "eth")
+    current_ask = client.get_current_ask(symbol: "eth")
+
+    TokenPrice.create!(symbol: "eth", price: ((current_bid + current_ask) / 2).round(2))
 
     if client.holding?(symbol: "eth")
-      current_bid = client.get_current_bid(symbol: "eth")
       updated_threshold = (current_bid * (1 - PERCENT_STEP)).round(2)
       Rails.logger.info "Price: $#{current_bid}. Threshold: #{current_threshold}. Holding..."
 
@@ -30,7 +33,6 @@ class Trader
         end
       end
     else # Not Holding
-      current_ask = client.get_current_ask(symbol: "eth")
       updated_threshold = (current_ask * (1 + PERCENT_STEP)).round(2)
       Rails.logger.info "Price: $#{current_ask}. Threshold: #{current_threshold}. Not holding..."
 
