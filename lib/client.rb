@@ -4,7 +4,7 @@ require 'httparty'
 require 'csv'
 
 class Trader
-  PERCENT_STEP = 0.005
+  PERCENT_STEP = Float(ENV["PERCENT_STEP"])
 
   def self.run
     client = Client::Private.new
@@ -20,14 +20,12 @@ class Trader
         Rails.logger.info "Setting current threshold to $#{updated_threshold}..."
         Redis.current.set("current_threshold", updated_threshold)
       elsif current_bid <= current_threshold
-        Rails.logger.info "Current bid of $#{current_bid} is less than current threshold of $#{current_threshold}..."
-        Rails.logger.info "Selling it all!!!"
+        Rails.logger.info "Current bid of $#{current_bid} is less than current threshold of $#{current_threshold}... Selling it all!!!"
         client.sell_all(symbol: "eth")
         Redis.current.del("current_threshold")
       else # current_bid > current_threshold
         if updated_threshold > current_threshold
-          Rails.logger.info "Updated threshold is more than current threshold."
-          Rails.logger.info "Resetting threshold to $#{updated_threshold}..."
+          Rails.logger.info "Updated threshold is more than current threshold. Resetting threshold to $#{updated_threshold}..."
           Redis.current.set("current_threshold", updated_threshold)
         end
       end
@@ -39,15 +37,13 @@ class Trader
       if !current_threshold
         Rails.logger.info "Setting current threshold to $#{updated_threshold}..."
         Redis.current.set("current_threshold", updated_threshold)
-      elsif current_ask <= current_threshold
-        Rails.logger.info "Current ask of $#{current_ask} is less than current threshold of $#{current_threshold}..."
-        Rails.logger.info "Buying it all!!!"
+      elsif current_ask >= current_threshold
+        Rails.logger.info "Current ask of $#{current_ask} is greater than current threshold of $#{current_threshold}... Buying it all!!!"
         client.buy_all(symbol: "eth")
         Redis.current.del("current_threshold")
-      elsif current_ask > current_threshold
+      else # current_ask < current_threshold
         if updated_threshold < current_threshold
-          Rails.logger.info "Updated threshold is less than current threshold."
-          Rails.logger.info "Resetting threshold to $#{updated_threshold}..."
+          Rails.logger.info "Updated threshold is less than current threshold. Resetting threshold to $#{updated_threshold}..."
           Redis.current.set("current_threshold", updated_threshold)
         end
       end
@@ -56,7 +52,7 @@ class Trader
 end
 module Client
   class Private
-    APPROXIMATE_ALL = 0.95
+    APPROXIMATE_ALL = 0.98
     MINIMUM_TOKEN_AMOUNT = 0.001
 
     def holding?(symbol:)
