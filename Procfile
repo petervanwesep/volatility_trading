@@ -1,1 +1,1 @@
-worker: bundle exec rails jobs:work
+worker: bundle exec sidekiq

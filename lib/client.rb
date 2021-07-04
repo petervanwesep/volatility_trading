@@ -6,39 +6,41 @@ require 'csv'
 class Trader
   PERCENT_STEP = 0.02
 
-  def self.loop
+  def self.run
+    puts "Hello world!"
     # if holding
     #   current_bid := get current bid
-    #   updated_threshold = current bid * (1 - PERCENT_STEP)
-    #   if no current threshold
+    #   updated_threshold := current bid * (1 - PERCENT_STEP)
+    #   if no current_threshold
     #     current_threshold := updated_threshold
     #   else if current_bid > previous_bid
     #     current_threshold := updated_threshold
-    #     Remove existing orders (should only be 1)
-    #     Place stop order to sell all at current threshold
-    #   previous_bid := current_bid
+    #   else if current_bid <= current_threshold
+    #     place sell order at current_threshold * 1.01
+    #     current_threshold := null
     # else (not holding)
     #   current_ask := get current ask
     #   updated_threshold = current ask * (1 + PERCENT_STEP)
-    #   if no current threshold
+    #   if no current_threshold
     #     current_threshold := updated_threshold
     #   else if current_price < previous_price
     #     current_threshold := updated_threshold
-    #     Remove existing orders (should only be 1)
-    #     Place stop order to buy all at current threshold
-    #   previous_ask := current_ask
+    #   else if current_bid >= current_threshold
+    #     place buy order at current_threshold * 0.99
+    #     current_threshold := null
   end
 end
 
 # Make a trade √
 # Sell all √
 # Buy all √
-# Make a stop order for buy all
-# Make a stop order for sell all
-# Cancel all orders
-# Make a stop order for buy all based on price
-# Make a stop order for sell all based on price
-# Make a stop order based on price direction and holdings
+# Make a order for buy all
+# Make a order for sell all
+# Get redis working locally
+# Get redis working remotely
+# Get worker working locally
+# Get worker working locally
+# Make a order based on price direction and holdings
 #
 
 module Client
@@ -66,8 +68,7 @@ module Client
         symbol: "#{symbol}USD",
         amount: token_balance * APPROXIMATE_ALL,
         price: 0.01,
-        type: "exchange stop limit",
-        stop_price: current_bid
+        type: "exchange limit",
       )
     end
 
@@ -75,13 +76,11 @@ module Client
       usd_balance = Float(balances.find { |e| e["currency"].downcase == "usd" }["available"])
       current_ask = get_current_ask(symbol: symbol).round(2)
       amount = ((usd_balance * APPROXIMATE_ALL) / current_ask).round(4)
-      binding.pry
       buy(
         symbol: "#{symbol}USD",
         amount: amount,
         price: 2**16,
-        type: "exchange stop limit",
-        stop_price: current_ask
+        type: "exchange limit",
       )
     end
 
@@ -89,29 +88,27 @@ module Client
       request("/v1/balances")
     end
 
-    def buy(symbol:, amount:, price:, type:, stop_price:)
+    def buy(symbol:, amount:, price:, type:)
       place_order(
         symbol: symbol,
         amount: amount,
-        price: (stop_price * 1.01).round(2),
+        price: (price * 1.01).round(2),
         side: "sell",
         type: type,
-        stop_price: stop_price,
       )
     end
 
-    def sell(symbol:, amount:, price:, type:, stop_price:)
+    def sell(symbol:, amount:, price:, type:)
       place_order(
         symbol: symbol,
         amount: amount,
-        price: (stop_price * 0.99).round(2),
+        price: (price * 0.99).round(2),
         side: "sell",
         type: type,
-        stop_price: stop_price,
       )
     end
 
-    def place_order(symbol:, amount:, price:, side:, type:, stop_price:)
+    def place_order(symbol:, amount:, price:, side:, type:)
       request(
         "/v1/order/new",
         symbol: symbol,
@@ -119,7 +116,6 @@ module Client
         price: price,
         side: side,
         type: type,
-        stop_price: stop_price,
       )
     end
 

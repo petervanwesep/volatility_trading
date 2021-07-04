@@ -7,6 +7,10 @@ ruby '2.7.1'
 gem 'rails', '~> 6.1.4'
 # Use sqlite3 as the database for Active Record
 gem 'pg'
+gem 'pry'
+gem 'redis-rails'
+gem 'sidekiq'
+
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem 'jbuilder', '~> 2.7'
 # Use Active Model has_secure_password
