@@ -32,21 +32,23 @@ module VolatilityTrading
     end
 
     def deliver!
-      Net::SMTP.start(ENV['MAILGUN_SMTP_SERVER'],
+      Net::SMTP.start(
+        ENV['MAILGUN_SMTP_SERVER'],
         ENV['MAILGUN_SMTP_PORT'],
         ENV['MAILGUN_DOMAIN'],
         ENV['MAILGUN_SMTP_LOGIN'],
         ENV['MAILGUN_SMTP_PASSWORD'],
         :plain
       ) do |smtp|
-        msgstr = <<END_OF_MESSAGE
+        msgstr = """
         From: Volatility Trader <volatilitytrader@gmail.com>
         To: #{@to}
         Subject: #{@subject}
         Date: #{Time.current.to_s}
 
         #{@text}
-END_OF_MESSAGE
+        """
+
         smtp.send_message msgstr, "volatilitytrader@gmail.com", @to
       end
     end

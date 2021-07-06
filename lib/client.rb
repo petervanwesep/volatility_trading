@@ -6,7 +6,7 @@ require_relative './mailer'
 
 module VolatilityTrading
   class Trader
-    PERCENT_STEP = Float(ENV["PERCENT_STEP"])
+    PERCENT_STEP = Float(ENV.fetch("PERCENT_STEP"))
 
     def self.run
       client = Client::Private.new
@@ -14,8 +14,6 @@ module VolatilityTrading
       current_threshold = Float(current_threshold) if current_threshold.present?
       current_bid = client.get_current_bid(symbol: "eth")
       current_ask = client.get_current_ask(symbol: "eth")
-
-      TokenPrice.create!(symbol: "eth", price: ((current_bid + current_ask) / 2).round(2))
 
       if client.holding?(symbol: "eth")
         updated_threshold = (current_bid * (1 - PERCENT_STEP)).round(2)
