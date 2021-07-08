@@ -3,6 +3,8 @@ class PriceCheckingWorker
   include Sidekiq::Worker
 
   def perform(symbol="eth")
+    return unless ENV['CHECK_PRICES'] == 'true'
+
     next_run_time = 1.minute.from_now.beginning_of_minute
 
     client = VolatilityTrading::Client::Private.new
