@@ -58,7 +58,7 @@ module VolatilityTrading
   end
   module Client
     class Private
-      APPROXIMATE_ALL = 0.98
+      APPROXIMATE_ALL = 0.99
       MINIMUM_TOKEN_AMOUNT = 0.001
 
       def holding?(symbol:)
