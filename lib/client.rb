@@ -20,16 +20,16 @@ module VolatilityTrading
         Rails.logger.info "Price: $#{current_bid}. Threshold: #{current_threshold}. Holding..."
 
         if !current_threshold
-          Rails.logger.info "Setting current threshold to $#{updated_threshold}..."
+          Rails.logger.info "ACTION - Setting current threshold to $#{updated_threshold}..."
           Redis.current.set("current_threshold", updated_threshold)
         elsif current_bid <= current_threshold
-          Rails.logger.info "Current bid of $#{current_bid} is less than current threshold of $#{current_threshold}... Selling it all!!!"
+          Rails.logger.info "ACTION - Current bid of $#{current_bid} is less than current threshold of $#{current_threshold}... Selling it all!!!"
           client.sell_all(symbol: "eth")
           Mailer.trade_report(price: current_bid, side: 'sell')
           Redis.current.del("current_threshold")
         else # current_bid > current_threshold
           if updated_threshold > current_threshold
-            Rails.logger.info "Updated threshold is more than current threshold. Resetting threshold to $#{updated_threshold}..."
+            Rails.logger.info "ACTION - Updated threshold is more than current threshold. Resetting threshold to $#{updated_threshold}..."
             Redis.current.set("current_threshold", updated_threshold)
             Mailer.threshold_reset(price: current_bid, current_threshold: updated_threshold)
           end
@@ -39,16 +39,16 @@ module VolatilityTrading
         Rails.logger.info "Price: $#{current_ask}. Threshold: #{current_threshold}. Not holding..."
 
         if !current_threshold
-          Rails.logger.info "Setting current threshold to $#{updated_threshold}..."
+          Rails.logger.info "ACTION - Setting current threshold to $#{updated_threshold}..."
           Redis.current.set("current_threshold", updated_threshold)
         elsif current_ask >= current_threshold
-          Rails.logger.info "Current ask of $#{current_ask} is greater than current threshold of $#{current_threshold}... Buying it all!!!"
+          Rails.logger.info "ACTION - Current ask of $#{current_ask} is greater than current threshold of $#{current_threshold}... Buying it all!!!"
           client.buy_all(symbol: "eth")
           Mailer.trade_report(price: current_ask, side: 'buy')
           Redis.current.del("current_threshold")
         else # current_ask < current_threshold
           if updated_threshold < current_threshold
-            Rails.logger.info "Updated threshold is less than current threshold. Resetting threshold to $#{updated_threshold}..."
+            Rails.logger.info "ACTION - Updated threshold is less than current threshold. Resetting threshold to $#{updated_threshold}..."
             Redis.current.set("current_threshold", updated_threshold)
             Mailer.threshold_reset(price: current_ask, current_threshold: updated_threshold)
           end
@@ -58,8 +58,8 @@ module VolatilityTrading
   end
   module Client
     class Private
-      APPROXIMATE_ALL = 0.975
-      MINIMUM_TOKEN_AMOUNT = 0.001
+      APPROXIMATE_ALL = Float(ENV.fetch('APPROXIMATE_ALL'))
+      MINIMUM_TOKEN_AMOUNT = Float(ENV.fetch('MINIMUM_TOKEN_AMOUNT'))
 
       def holding?(symbol:)
         token_balance = Float(balances.find { |e| e["currency"].downcase == symbol.downcase }["available"])
@@ -145,18 +145,6 @@ module VolatilityTrading
           query: nil,
           headers: headers,
         )
-      end
-
-      def cancel_orders
-        # HTTParty.post(
-        #   "/v1/order/cancel/session",
-        #   query: {
-        #     payload: {
-        #       request: "/v1/order/cancel/session",
-        #       nonce: nonce
-        #     }
-        #   },
-        # )
       end
 
       def build_payload(params)
