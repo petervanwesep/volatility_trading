@@ -111,7 +111,7 @@ module VolatilityTrading
         p place_order(
           symbol: symbol,
           amount: amount,
-          price: (price * 1.01).round(2),
+          price: (price * 1.001).round(2),
           side: "buy",
           type: type,
         )
@@ -121,14 +121,14 @@ module VolatilityTrading
         p place_order(
           symbol: symbol,
           amount: amount,
-          price: (price * 0.99).round(2),
+          price: (price * 0.999).round(2),
           side: "sell",
           type: type,
         )
       end
 
       def place_order(symbol:, amount:, price:, side:, type:)
-        request(
+        response = request(
           "/v1/order/new",
           symbol: symbol,
           amount: amount,
@@ -153,7 +153,7 @@ module VolatilityTrading
       end
 
       def signature(encoded_payload)
-        OpenSSL::HMAC.hexdigest("SHA384", ENV['GEMINI_API_SECRET'], encoded_payload)
+        OpenSSL::HMAC.hexdigest("SHA384", ENV.fetch('GEMINI_API_SECRET'), encoded_payload)
       end
 
       def base_url
@@ -171,7 +171,7 @@ module VolatilityTrading
         {
           "Content-Length" => "0",
           "Content-Type" => "text/plain",
-          "X-GEMINI-APIKEY" => ENV["GEMINI_API_KEY"],
+          "X-GEMINI-APIKEY" => ENV.fetch("GEMINI_API_KEY"),
           "X-GEMINI-PAYLOAD" => encoded_payload,
           "X-GEMINI-SIGNATURE" => signature,
           "Cache-Control" => "no-cache",
