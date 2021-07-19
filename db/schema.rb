@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2021_07_04_221858) do
+ActiveRecord::Schema.define(version: 2021_07_19_164426) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -18,7 +18,7 @@ ActiveRecord::Schema.define(version: 2021_07_04_221858) do
   create_table "token_prices", force: :cascade do |t|
     t.string "symbol", null: false
     t.decimal "price", null: false
-    t.datetime "checked_at", default: "2021-07-04 22:26:04", null: false
+    t.datetime "checked_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
   end
 
 end

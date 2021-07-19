@@ -1,1 +1,1 @@
-worker: bundle exec sidekiq
+worker: bundle exec rake db:migrate ; bundle exec sidekiq
