@@ -1,0 +1,30 @@
+{
+  "eth": {
+    "percent": 0.25,
+    "minimum_holding": 0.01
+  },
+  "btc": {
+    "percent": 0.25,
+    "minimum_holding": 0.01
+  },
+  "doge": {
+    "percent": 0.1,
+    "minimum_holding": 0.01
+  },
+  "ltc": {
+    "percent": 0.1,
+    "minimum_holding": 0.01
+  },
+  "matic": {
+    "percent": 0.1,
+    "minimum_holding": 0.01
+  },
+  "fil": {
+    "percent": 0.1,
+    "minimum_holding": 0.01
+  },
+  "link": {
+    "percent": 0.1,
+    "minimum_holding": 0.01
+  }
+}

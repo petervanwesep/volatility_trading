@@ -10,10 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2021_07_19_164426) do
+ActiveRecord::Schema.define(version: 2021_07_21_222746) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "orders", force: :cascade do |t|
+    t.string "external_id", null: false
+    t.string "symbol", null: false
+    t.decimal "amount", null: false
+    t.decimal "price", null: false
+    t.string "side", null: false
+    t.decimal "fee", default: "0.0", null: false
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+  end
 
   create_table "token_prices", force: :cascade do |t|
     t.string "symbol", null: false
