@@ -11,6 +11,9 @@ gem 'pry'
 gem 'redis-rails'
 gem 'sidekiq'
 
+gem "sentry-ruby"
+gem "sentry-rails"
+
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem 'jbuilder', '~> 2.7'
 # Use Active Model has_secure_password

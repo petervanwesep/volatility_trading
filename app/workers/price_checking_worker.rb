@@ -7,9 +7,9 @@ class PriceCheckingWorker
 
     next_run_time = 1.minute.from_now.beginning_of_minute
 
-    client = VolatilityTrading::Client::Private.new
-    current_bid = client.get_current_bid(symbol: symbol)
-    current_ask = client.get_current_ask(symbol: symbol)
+    client = VolatilityTrading::Client.new(symbol: symbol)
+    current_bid = client.get_current_bid
+    current_ask = client.get_current_ask
 
     return unless current_bid && current_ask
 
