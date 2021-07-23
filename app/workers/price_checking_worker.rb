@@ -1,19 +1,18 @@
-require_relative "../../lib/client"
+require_relative "../../lib/price_checker"
+require_relative "../../lib/portfolio"
 class PriceCheckingWorker
   include Sidekiq::Worker
 
-  def perform(symbol="eth")
+  def perform
     return unless ENV['CHECK_PRICES'] == 'true'
 
     next_run_time = 1.minute.from_now.beginning_of_minute
 
-    client = VolatilityTrading::Client.new(symbol: symbol)
-    current_bid = client.get_current_bid
-    current_ask = client.get_current_ask
-
-    return unless current_bid && current_ask
-
-    TokenPrice.create!(symbol: symbol, price: ((current_bid + current_ask)/ 2).round(2))
+    VolatilityTrading::Portfolio.settings.keys.each do |symbol|
+      next if symbol == 'usd'
+      VolatilityTrading::PriceChecker.run(symbol: symbol)
+    end
+  ensure
     PriceCheckingWorker.perform_at(next_run_time)
   end
 end

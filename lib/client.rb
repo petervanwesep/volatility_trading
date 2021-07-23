@@ -3,79 +3,8 @@ require 'pry'
 require 'httparty'
 require 'csv'
 require_relative './mailer'
-
+require_relative './portfolio'
 module VolatilityTrading
-  PERCENT_STEP = Float(ENV.fetch("PERCENT_STEP"))
-  THRESHOLD_KEY = "current_threshold"
-
-  module Portfolio
-    def self.settings
-      JSON.parse(File.read("lib/portfolio.json")).with_indifferent_access
-    end
-  end
-
-  class Trader
-    def self.run(symbol:)
-      client = Client.new(symbol: symbol)
-      engine = Engine.new(symbol: symbol)
-
-      engine.update_threshold!
-
-      if engine.time_to_sell?
-        Rails.logger.info "ACTION - Current bid of $#{client.current_bid} is less than current threshold of $#{engine.current_threshold}... Selling all the #{symbol}!!!"
-        client.sell_all!
-      elsif engine.time_to_buy?
-        Rails.logger.info "ACTION - Current ask of $#{client.current_ask} is greater than current threshold of $#{engine.current_threshold}... Buying all the #{symbol}!!!"
-        client.buy_all!
-      else
-        Rails.logger.info "#{symbol.upcase} price: $#{client.current_bid}. Threshold: #{engine.current_threshold}. Holding..."
-      end
-    end
-  end
-
-  class Engine
-    THRESHOLD_WINDOW = Integer(ENV.fetch("THRESHOLD_WINDOW")) || 60
-
-    attr_reader :client, :holding
-
-    def initialize(symbol:)
-      @client = Client.new(symbol: symbol)
-      @holding = client.holding?
-      @threshold_key = "#{THRESHOLD_KEY}_#{symbol}"
-    end
-
-    def clear_threshold!
-      Redis.current.del(@threshold_key)
-    end
-
-    def update_threshold!
-      last_order_at = Time.at(Integer(Redis.current.get("last_action") || 0))
-      recent_prices = TokenPrice.where("checked_at > ?", [THRESHOLD_WINDOW.minutes.ago, last_order_at].max).map(&:price)
-      extremum = holding ? recent_prices.max : recent_prices.min
-
-      return unless extremum
-
-      updated_threshold = holding ?
-        (extremum * (1 - PERCENT_STEP)).round(2) :
-        (extremum * (1 + PERCENT_STEP)).round(2)
-
-      Redis.current.set(@threshold_key, updated_threshold)
-    end
-
-    def current_threshold
-      current_threshold = Redis.current.get(@threshold_key)
-      Float(current_threshold) if current_threshold.present?
-    end
-
-    def time_to_sell?
-      client.holding? && client.current_bid <= current_threshold
-    end
-
-    def time_to_buy?
-      !client.holding? && client.current_ask >= current_threshold
-    end
-  end
-
   class Client
     APPROXIMATE_ALL = Float(ENV.fetch('APPROXIMATE_ALL'))
 
@@ -86,20 +15,28 @@ module VolatilityTrading
     end
 
     def minimum_token_amount
-      @minimum_token_amount ||= Float(ENV.fetch("MINIMUM_TOKEN_AMOUNT_#{symbol}"))
+      @minimum_token_amount ||= Portfolio.settings[symbol][:minimum_holding]
+    end
+
+    def token_balance
+      balance = balances.find { |e| e.symbol == symbol.downcase }
+      balance ? balance.amount : 0
+    end
+
+    def usd_balance
+      Float(balances.find { |e| e.symbol == "usd" }.amount)
     end
 
     def holding?
-      token_balance = Float(balances.find { |e| e["currency"].downcase == symbol.downcase }["available"])
       token_balance > minimum_token_amount
     end
 
     def current_ask
-      @current_ask ||= get_current_ask
+      @current_ask ||= get_current_ask.round(4)
     end
 
     def current_bid
-      @current_bid ||= get_current_bid
+      @current_bid ||= get_current_bid.round(4)
     end
 
     def get_current_ask
@@ -110,10 +47,15 @@ module VolatilityTrading
       get_prices[1]
     end
 
+    def price
+      base_uri = "https://api.gemini.com/v1/pricefeed"
+      Float(HTTParty.get(base_uri).find { |e| e["pair"] == "#{symbol.upcase}USD" }["price"])
+    end
+
     def get_prices
       base_uri = "https://api.gemini.com/v2/ticker"
       response = HTTParty.get("#{base_uri}/#{symbol}usd")
-      [Float(response["ask"]).round(2), Float(response["bid"]).round(2)]
+      [Float(response["ask"]), Float(response["bid"])]
     end
 
     def percent_of_portfolio
@@ -121,44 +63,66 @@ module VolatilityTrading
     end
 
     def sell_all!
-      token_balance = Float(balances.find { |e| e["currency"].downcase == symbol.downcase }["available"])
-      current_bid = get_current_bid.round(2)
       sell(
-        amount: token_balance * APPROXIMATE_ALL * percent_of_portfolio,
+        amount: token_balance * APPROXIMATE_ALL,
         price: current_bid,
-        type: "exchange limit",
       )
     end
 
     def buy_all!
-      usd_balance = Float(balances.find { |e| e["currency"].downcase == "usd" }["available"])
-      current_ask = get_current_ask.round(2)
       buy(
-        amount: ((usd_balance * APPROXIMATE_ALL) / current_ask),
+        amount: (usd_to_buy / current_ask),
         price: current_ask,
-        type: "exchange limit",
       )
     end
 
-    def balances
-      request("/v1/balances")
+    def usd_to_buy
+      held_assets = balances.select(&:holding)
+      unheld_assets = Portfolio.settings.delete_if { |e| held_assets.map(&:symbol).include?(e) }
+      total_percentage = unheld_assets.values.map { |e| e[:percent] }.sum
+      return 0 unless Portfolio.settings[symbol].present?
+      percent_to_buy = Portfolio.settings[symbol][:percent] / total_percentage
+      (usd_balance * APPROXIMATE_ALL * percent_to_buy)
     end
 
-    def buy(amount:, price:, type:)
+    class TokenBalance
+      attr_reader :symbol, :amount, :holding
+
+      def initialize(symbol:, amount:, holding:)
+        @symbol = symbol
+        @amount = amount
+        @holding = holding
+      end
+    end
+
+    def balances
+      response = request("/v1/balances")
+      JSON.parse(response.body)
+        .map do |e|
+          p "Not a HASH: #{e}" unless e.is_a?(Hash)
+          next unless Portfolio.settings[e["currency"].downcase].present?
+          TokenBalance.new(
+            symbol: e["currency"].downcase,
+            amount: Float(e["amount"]),
+            holding: Float(e["amount"]) > Portfolio.settings[e["currency"].downcase][:minimum_holding]
+          )
+        end
+        .compact
+    end
+
+    def buy(amount:, price:)
       place_order(
         amount: amount,
         price: (price * 1.001).round(2),
         side: "buy",
-        type: type,
       )
     end
 
-    def sell(amount:, price:, type:)
+    def sell(amount:, price:)
       place_order(
         amount: amount,
         price: (price * 0.999).round(2),
         side: "sell",
-        type: type,
       )
     end
 
@@ -170,20 +134,21 @@ module VolatilityTrading
       )
     end
 
-    def place_order(amount:, price:, side:, type:)
-      response = request(
+
+
+    def place_order(amount:, price:, side:)
+      response = p request(
         "/v1/order/new",
         symbol: "#{symbol}USD",
         amount: amount.round(4),
         price: price,
         side: side,
-        type: type,
+        type: 'exchange limit',
+        options: ['immediate-or-cancel'],
       )
 
       if response.success?
         status_response = order_status(order_id: response["order_id"])
-
-        Redis.current.set("last_order", Time.current.to_i)
 
         Order.create!(
           external_id: response["order_id"],
@@ -191,11 +156,11 @@ module VolatilityTrading
           amount: status_response["executed_amount"],
           price: status_response["avg_execution_price"],
           side: status_response["side"],
-          fee: Float(status_response.dig("trades", 0, "fee_amount")).round(2),
+          fee: Float(status_response.dig("trades", 0, "fee_amount") || 0).round(2),
         )
       end
 
-      p response
+      response
     end
 
     def request(path, payload={})
