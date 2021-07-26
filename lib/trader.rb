@@ -20,9 +20,7 @@ module VolatilityTrading
           client.buy_all!
         else
           holding_text = client.holding? ? "Holding" : "Not holding"
-          if Time.current.to_i % 100 == 0
-            Rails.logger.info "#{symbol.upcase} price: $#{client.current_bid}. Threshold: #{engine.current_threshold}. #{holding_text} #{symbol.upcase}..."
-          end
+          Rails.logger.info "#{symbol.upcase} price: $#{client.current_bid}. Threshold: #{engine.current_threshold}. #{holding_text} #{symbol.upcase}..."
         end
       end
     end

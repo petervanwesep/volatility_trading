@@ -13,6 +13,6 @@ class PriceCheckingWorker
       VolatilityTrading::PriceChecker.run(symbol: symbol)
     end
   ensure
-    PriceCheckingWorker.perform_at(next_run_time)
+    self.class.perform_at(next_run_time)
   end
 end

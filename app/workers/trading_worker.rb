@@ -5,8 +5,9 @@ class TradingWorker
   CHECK_FREQUENCY = Integer(ENV['CHECK_FREQUENCY'])
 
   def perform(*args)
+    time_to_run = 1.minute.from_now.beginning_of_minute
     VolatilityTrading::Trader.run
   ensure
-    TradingWorker.perform_in(CHECK_FREQUENCY.seconds)
+    self.class.perform_at(time_to_run)
   end
 end

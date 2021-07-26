@@ -99,8 +99,7 @@ module VolatilityTrading
       response = request("/v1/balances")
       JSON.parse(response.body)
         .map do |e|
-          p "Not a HASH: #{e}" unless e.is_a?(Hash)
-          next unless Portfolio.settings[e["currency"].downcase].present?
+          next unless e.is_a?(Hash) && Portfolio.settings[e["currency"].downcase].present?
           TokenBalance.new(
             symbol: e["currency"].downcase,
             amount: Float(e["amount"]),
@@ -113,7 +112,7 @@ module VolatilityTrading
     def buy(amount:, price:)
       place_order(
         amount: amount,
-        price: (price * 1.001).round(2),
+        price: (price * 1.005).round(2),
         side: "buy",
       )
     end
@@ -121,7 +120,7 @@ module VolatilityTrading
     def sell(amount:, price:)
       place_order(
         amount: amount,
-        price: (price * 0.999).round(2),
+        price: (price * 0.995).round(2),
         side: "sell",
       )
     end
