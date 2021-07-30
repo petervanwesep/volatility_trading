@@ -1,23 +1,15 @@
 {
   "eth": {
-    "percent": 0.25,
+    "percent": 0.4,
     "minimum_holding": 0.01
   },
   "btc": {
-    "percent": 0.25,
+    "percent": 0.4,
     "minimum_holding": 0.001
   },
-  "doge": {
-    "percent": 0.15,
-    "minimum_holding": 2
-  },
   "ltc": {
-    "percent": 0.1,
+    "percent": 0.2,
     "minimum_holding": 0.005
-  },
-  "link": {
-    "percent": 0.15,
-    "minimum_holding": 0.03
   },
   "usd": {
     "percent": null,
